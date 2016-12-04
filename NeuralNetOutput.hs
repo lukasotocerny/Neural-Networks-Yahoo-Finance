@@ -27,7 +27,7 @@ main = do
     putStrLn ("Write the number of input, hidden and output neurons respectively (e.g. 2 5 1):")
     dim_temp <- getLine
     let dim = map read (words dim_temp)
-    let network = buildGenNetwork dim
+    let network = buildNetwork dim
     putStrLn ("Write the input:")
     dim_inp <- getLine
     let inp = map read (words dim_inp)
