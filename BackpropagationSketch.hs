@@ -1,4 +1,5 @@
 -- Neural net backpropagation
+-- Successfully decreasing weights after an iteration and learning
 
 module NeuralNet (LayerWeights, buildNetwork, iteration) where
 
