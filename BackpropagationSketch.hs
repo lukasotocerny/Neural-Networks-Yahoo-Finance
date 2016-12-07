@@ -13,6 +13,7 @@ data LayerError = LayerError { errors :: Matrix Double }
 
 type Network = [ LayerWeights ]
 type PassedNetwork = [ LayerOutput ]
+type TrainingSet = [([Double],[Double])]
 
 -- Builds networks with initial weights=1 and dimensions: input, hidden 1, hidden 2.., output layer
 buildNetwork :: [Int] -> Network
@@ -53,17 +54,33 @@ backpropagate layerI layerJ = LayerError { errors = sigmoid_der * sumOfErrs }
     sumOfErrs = weights <> err
 
 -- Backward pass of errors through scanr function (error is propagated as column vector)
-backwardPass :: PassedNetwork -> [Double] -> [Double] -> [LayerError]
-backwardPass net output target = scanr backpropagate layerN (drop 2 net)
+backwardPass :: PassedNetwork -> [Double] -> [LayerError]
+backwardPass net target = scanr backpropagate layerN (drop 2 net)
     where
+    output = toList ( flatten $ outputs (last net) )
     dim_out = length output :: Int
     ones = (dim_out><1) (repeat 1.0) :: Matrix Double
     diff = (dim_out><1) (zipWith (-) target output) :: Matrix Double
     out = (dim_out><1) output
     layerN = LayerError { errors = out * ( ones + ((-1)*out) ) * diff :: Matrix Double }
 
--- Testing network
-testNet :: Network
-testNet = [ LayerWeights { weights = (2><2) [0.1,0.4,0.8,0.6] }, LayerWeights { weights = (2><1) [0.3,0.9] } ]
-passedNet = forwardPass testNet [0.35,0.9]
+-- The zipping function for updating weights.
+updateWeights :: Double -> LayerOutput -> LayerError -> LayerWeights
+updateWeights eps (LayerOutput {outWeights=x,outputs=out,inputs=z}) (LayerError {errors=err}) = LayerWeights {weights=out+rate*matrix}
+    where
+    matrix = out <> err
+    dim = size matrix
+    rate = (fst dim><snd dim) (repeat eps)
 
+-- Completes a whole iteration, return new set of weights. Args: network, input, target, learning rate
+iteration :: Network -> [Double] -> [Double] -> Double -> Network
+iteration net input target rate = zipWith (updateWeights rate) (tail passedNet) errors
+    where
+    passedNet = forwardPass net input
+    errors = backwardPass passedNet target
+
+-- Format training data set
+input :: TrainingSet -> [[Double]]
+input xs = [ fst x | x <- xs ]
+target :: TrainingSet -> [[Double]]
+target xs = [ snd x | x <- xs ]
