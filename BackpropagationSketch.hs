@@ -1,5 +1,6 @@
 -- Neural net backpropagation
--- Training not implemented yet. Forward and backward passes work
+
+module NeuralNet (LayerWeights, buildNetwork, iteration) where
 
 import Numeric.LinearAlgebra
 import Data.List
