@@ -5,7 +5,7 @@ of machine learning and artificial intelligence. So far, I have created only two
 perceptron algorithm in `SingleLayerPerceptron.hs` file, which is cute, but has several limitations. It takes a n-dimensional input vector and return binary classification.
 It can be trained only on linearly seperable dataset.
 
-
+<h3>Backpropagation in Yahoo Stock Data Analysis</h3>
 The other files are project of the analysis of Stock Market, using data from the YQL queries in Yahoo Finance. The `FrontEnd.hs` file 
 serves a front-end for the back-end training in `NeuralNet` module and parsing of data into JSON files from the `Parser` module. So far the results 
 look reasonable, I shall do statistical analysis in the future. `reality_out.csv` is a comma-separated-value file of the real quotes, whereas 
