@@ -1,14 +1,16 @@
--- Neural net backpropagation
--- Successfully decreasing weights after an iteration and learning
+-- NeuralNet.hs Backend for the neural net training
 
-module NeuralNet (LayerWeights, buildNetwork, iteration) where
+module NeuralNet (construct, train, output, mistake) where
 
 import Numeric.LinearAlgebra
 import Data.List
+import System.Random
 
 -- Data types with constructors
 data LayerWeights = LayerWeights { weights :: Matrix Double }
-data LayerOutput = LayerOutput { outWeights :: Matrix Double, outputs :: Matrix Double, inputs :: Matrix Double } | InputLayer { outputs :: Matrix Double, inputs :: Matrix Double }
+    deriving (Show)
+data LayerOutput = LayerOutput { weightsIn :: Matrix Double, outputs :: Matrix Double, inputs :: Matrix Double }
+                 | InputLayer { outputs :: Matrix Double, inputs :: Matrix Double }
     deriving (Show)
 data LayerError = LayerError { errors :: Matrix Double }
     deriving (Show)
@@ -17,9 +19,9 @@ type Network = [ LayerWeights ]
 type PassedNetwork = [ LayerOutput ]
 type TrainingSet = [([Double],[Double])]
 
--- Builds networks with initial weights=1 and dimensions: input, hidden 1, hidden 2.., output layer
-buildNetwork :: [Int] -> Network
-buildNetwork xs = [ LayerWeights { weights = (x><y) (repeat 1) } | (x, y) <- zip xs (tail xs) ]
+-- Builds networks with random initial weights and dimensions: input, hidden 1, hidden 2.., output layer
+construct :: [Int] -> Network
+construct xs = [ LayerWeights { weights = (x><y) (randoms $ mkStdGen 1) } | (x, y) <- zip xs (tail xs) ]
 
 -- Sigmoid activation function
 sigmoid :: Double -> Double
@@ -31,7 +33,7 @@ matrixMult xs ys = fromLists [ [ sigmoid ( sum (zipWith (*) x y) ) | y <- toList
 
 -- Propagates output from layer i to layer j through weights, saves output and input
 propagate :: LayerOutput -> LayerWeights -> LayerOutput
-propagate layerI layerJ = LayerOutput { outWeights = weiJ, outputs = (matrixMult outI weiJ), inputs = outI }
+propagate layerI layerJ = LayerOutput { weightsIn = weiJ, outputs = (matrixMult outI weiJ), inputs = outI }
     where
     outI = outputs layerI :: Matrix Double
     weiJ = weights layerJ :: Matrix Double
@@ -47,13 +49,13 @@ forwardPass net inp = scanl propagate layer0 net
 backpropagate :: LayerOutput -> LayerError -> LayerError
 backpropagate layerI layerJ = LayerError { errors = sigmoid_der * sumOfErrs }
     where
-    weights = outWeights layerI :: Matrix Double 
-    out = tr' (inputs layerI) :: Matrix Double
-    dim_out = rows weights :: Int
-    ones = (dim_out><1) (repeat 1.0) :: Matrix Double
-    sigmoid_der = out * ( ones + ((-1)*out) )
+    weightsIJ = weightsIn layerI :: Matrix Double 
+    outI = tr' (inputs layerI) :: Matrix Double
+    dim_outI = rows weightsIJ :: Int
+    ones = (dim_outI><1) (repeat 1.0) :: Matrix Double
+    sigmoid_der = outI * ( ones + ((-1)*outI) )
     err = errors layerJ
-    sumOfErrs = weights <> err
+    sumOfErrs = weightsIJ <> err
 
 -- Backward pass of errors through scanr function (error is propagated as column vector)
 backwardPass :: PassedNetwork -> [Double] -> [LayerError]
@@ -68,21 +70,38 @@ backwardPass net target = scanr backpropagate layerN (drop 2 net)
 
 -- The zipping function for updating weights.
 updateWeights :: Double -> LayerOutput -> LayerError -> LayerWeights
-updateWeights eps (LayerOutput {outWeights=x,outputs=out,inputs=z}) (LayerError {errors=err}) = LayerWeights {weights=out+rate*matrix}
+updateWeights eps (LayerOutput {weightsIn=x,outputs=out,inputs=z}) (LayerError {errors=err}) = LayerWeights {weights=x+rate*matrix}
     where
-    matrix = out <> err
+    matrix = err <> out
     dim = size matrix
     rate = (fst dim><snd dim) (repeat eps)
 
 -- Completes a whole iteration, return new set of weights. Args: network, input, target, learning rate
-iteration :: Network -> [Double] -> [Double] -> Double -> Network
-iteration net input target rate = zipWith (updateWeights rate) (tail passedNet) errors
+update :: Network -> [Double] -> [Double] -> Double -> Network
+update net input target rate = zipWith (updateWeights rate) (tail passedNet) errors
     where
     passedNet = forwardPass net input
     errors = backwardPass passedNet target
 
--- Format training data set
-input :: TrainingSet -> [[Double]]
-input xs = [ fst x | x <- xs ]
-target :: TrainingSet -> [[Double]]
-target xs = [ snd x | x <- xs ]
+-- Returns outputs of the network for a given data set
+output :: Network -> Maybe [([Double],[Double])] -> [[Double]]
+output net Nothing = error "Error while loading data."
+output net (Just xs) = [ singleOut net x | x <- xs ]
+    where
+    singleOut :: Network -> ([Double],[Double]) -> [Double]
+    singleOut net input = head $ toLists $ outputs (last $ forwardPass net (fst input))
+
+-- Returns the sum of mistakes on the whole data set
+mistake :: Network -> Maybe TrainingSet -> Double
+mistake net Nothing = error "Error while loading data."
+mistake net (Just []) = 0
+mistake net (Just (x:xs)) = errs + mistake net (Just xs)
+    where
+    outs = head . toLists . outputs . last $ forwardPass net (fst x)
+    errs = sum $ zipWith ( \x y -> 0.5*(x-y)*(x-y) ) (snd x) outs
+
+-- Iterates the network on the same training set n times
+train :: Network -> Maybe TrainingSet -> Double -> Int -> Network
+train net Nothing rate i = error "Error while loading data."
+train net (Just set) rate 0 = net
+train net (Just set) rate i = train (foldr (\a b -> update b (fst a) (snd a) rate) net set) (Just set) rate (i-1)
