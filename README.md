@@ -25,10 +25,10 @@ this data type generically through the `decode` command.
 
 
 ```haskell
-stockToData :: Int -> [Quote] -> [([Double],[Double])]
+stockToData :: Int -> [Quote] -> [([Double],Double)]
 ```
 
-This method generates n-dimensional inputs with the target value, in the form (input vector, target). Array is used in case of multidimensional target.
+This method generates n-dimensional inputs with the target value, in the form (input vector, target).
 
 <h3>NeuralNet.hs</h3>
 The data constructors are not exported, therefore they serve as an abstract data type for other modules.
@@ -39,9 +39,9 @@ Construct a network with dimensions of `[n1,n2,n3,...,ni]`, where `n1` is input 
 in the range of [0,1].
 
 ```haskell
-train :: Network -> Maybe [([Double],[Double])] -> Double -> Int -> Network
+train :: Network -> Maybe [([Double],Double)] -> Double -> Int -> Network
 ```
-Trains the network with the backpropagation algorithm given `Maybe [([Double],[Double])]` as training set. `Maybe` is used for simplicity when used in 
+Trains the network with the backpropagation algorithm given `Maybe [([Double],Double)]` as training set. `Maybe` is used for simplicity when used in 
 `FrontEnd.hs` due to the conversion from JSON. Takes learning rate and number of epochs as arguments as well.
 
 ```haskell
@@ -55,7 +55,7 @@ predict :: Network -> [Double] -> Int -> [Double]
 Predicts the evolution of stock for n days given an initial input.
 
 ```haskell
-mistake :: Network -> Maybe [([Double],[Double])] -> Double
+mistake :: Network -> Maybe [([Double],Double)] -> Double
 ```
 Calculates the square error summed over all the training set.
 

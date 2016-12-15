@@ -1,6 +1,6 @@
 -- NeuralNet.hs Backend for the neural net training
 
-module NeuralNet (construct, train, output, mistake, predict) where
+module NeuralNet (construct, train, output, mistake, output_series, predict) where
 
 import Numeric.LinearAlgebra
 import Data.List
@@ -17,7 +17,7 @@ data LayerError = LayerError { errors :: Matrix Double }
 
 type Network = [ LayerWeights ]
 type PassedNetwork = [ LayerOutput ]
-type TrainingSet = [([Double],[Double])]
+type TrainingSet = [([Double],Double)]
 
 -- Builds networks with random initial weights and dimensions: input, hidden 1, hidden 2.., output layer
 construct :: [Int] -> Network
@@ -27,13 +27,9 @@ construct xs = [ LayerWeights { weights = (x><y) (randoms $ mkStdGen 1) } | (x, 
 sigmoid :: Double -> Double
 sigmoid x = 1 / (1 + exp(-x)) 
 
--- Matrix multiplication with incorporated sigmoid operation
-matrixMult :: Matrix Double -> Matrix Double -> Matrix Double
-matrixMult xs ys = fromLists [ [ sigmoid ( sum (zipWith (*) x y) ) | y <- toLists (tr' ys) ] | x <- toLists xs ]
-
 -- Propagates output from layer i to layer j through weights, saves output and input
 propagate :: LayerOutput -> LayerWeights -> LayerOutput
-propagate layerI layerJ = LayerOutput { weightsIn = weiJ, outputs = (matrixMult outI weiJ), inputs = outI }
+propagate layerI layerJ = LayerOutput { weightsIn = weiJ, outputs = (cmap sigmoid $ outI <> weiJ), inputs = outI }
     where
     outI = outputs layerI :: Matrix Double
     weiJ = weights layerJ :: Matrix Double
@@ -51,33 +47,28 @@ backpropagate layerI layerJ = LayerError { errors = sigmoid_der * sumOfErrs }
     where
     weightsIJ = weightsIn layerI :: Matrix Double 
     outI = tr' (inputs layerI) :: Matrix Double
-    dim_outI = rows weightsIJ :: Int
-    ones = (dim_outI><1) (repeat 1.0) :: Matrix Double
-    sigmoid_der = outI * ( ones + ((-1)*outI) )
+    sigmoid_der = cmap ( \x -> x * (1-x) ) outI
     err = errors layerJ
     sumOfErrs = weightsIJ <> err
 
 -- Backward pass of errors through scanr function (error is propagated as column vector)
-backwardPass :: PassedNetwork -> [Double] -> [LayerError]
+backwardPass :: PassedNetwork -> Double -> [LayerError]
 backwardPass net target = scanr backpropagate layerN (drop 2 net)
     where
-    output = toList ( flatten $ outputs (last net) )
-    dim_out = length output :: Int
-    ones = (dim_out><1) (repeat 1.0) :: Matrix Double
-    diff = (dim_out><1) (zipWith (-) target output) :: Matrix Double
-    out = (dim_out><1) output
-    layerN = LayerError { errors = out * ( ones + ((-1)*out) ) * diff :: Matrix Double }
+    out_vec = outputs (last net)
+    tar_vec = (1><1) [target] :: Matrix Double
+    diff_vec = tar_vec - out_vec :: Matrix Double
+    sigmoid_der = cmap ( \x -> x * (1-x) ) out_vec
+    layerN = LayerError { errors = out_vec * diff_vec :: Matrix Double }
 
 -- The zipping function for updating weights.
 updateWeights :: Double -> LayerOutput -> LayerError -> LayerWeights
-updateWeights eps (LayerOutput {weightsIn=x,outputs=out,inputs=z}) (LayerError {errors=err}) = LayerWeights {weights=x+rate*matrix}
+updateWeights eps (LayerOutput {weightsIn=x,outputs=out,inputs=z}) (LayerError {errors=err}) = LayerWeights {weights=x+matrix}
     where
-    matrix = err <> out
-    dim = size matrix
-    rate = (fst dim><snd dim) (repeat eps)
+    matrix = cmap ( \x -> eps * x ) $ err <> out
 
--- Completes a whole iteration, return new set of weights. Args: network, input, target, learning rate
-update :: Network -> [Double] -> [Double] -> Double -> Network
+-- Completes one iteration, return new set of weights. Args: network, input, target, learning rate
+update :: Network -> [Double] -> Double -> Double -> Network
 update net input target rate = zipWith (updateWeights rate) (tail passedNet) errors
     where
     passedNet = forwardPass net input
@@ -93,8 +84,8 @@ mistake net Nothing = error "Request for financial data is incorrect."
 mistake net (Just []) = 0
 mistake net (Just (x:xs)) = errs + mistake net (Just xs)
     where
-    outs = head . toLists . outputs . last $ forwardPass net (fst x)
-    errs = sum $ zipWith ( \x y -> 0.5*(x-y)*(x-y) ) (snd x) outs
+    outs = head . head . toLists . outputs . last $ forwardPass net (fst x)
+    errs = ( \x y -> 0.5*(x-y)*(x-y) ) (snd x) outs
 
 -- Iterates the network on the same training set n times
 train :: Network -> Maybe TrainingSet -> Double -> Int -> Network
@@ -102,7 +93,7 @@ train net Nothing rate i = error "Request for financial data is incorrect."
 train net (Just set) rate 0 = net
 train net (Just set) rate i = train (foldr (\a b -> update b (fst a) (snd a) rate) net set) (Just set) rate (i-1)
 
--- Network prediction for n days, taking k-dimensional input vector
+-- Network prediction for n days, taking 
 predict :: Network -> [Double] -> Int -> [Double]
 predict net inp 0 = []
 predict net inp days = prediction : predict net new_inp (days-1)
