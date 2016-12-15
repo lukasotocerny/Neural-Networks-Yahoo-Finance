@@ -20,7 +20,7 @@ data Quote = Quote {
     } deriving (Show, Generic)
 ```
 
-This is a data constructor corresponding to the information received in JSON format from YQL API. Module `Data.Aeson` converts JSON data into 
+The `Quote` data constructor corresponds to the information received in JSON format from YQL API. Module `Data.Aeson` converts JSON data into 
 this data type generically through the `decode` command.
 
 
@@ -31,13 +31,44 @@ stockToData :: Int -> [Quote] -> [([Double],[Double])]
 This method generates n-dimensional inputs with the target value, in the form (input vector, target). Array is used in case of multidimensional target.
 
 <h3>NeuralNet.hs</h3>
-serves a front-end for the back-end training in `NeuralNet` module and parsing of data into JSON files from the `Parser` module. So far the results 
-look reasonable, I shall do statistical analysis in the future. `reality_out.csv` is a comma-separated-value file of the real quotes, whereas 
-`network_out.csv` shows the output of the network. `parsed_data.json` is a JSON file containg the raw (partially parsed) input from the YQL query.
-I still have to separate the training set and test set, currently training and test sets are one and other.
+The data constructors are not exported, therefore they serve as an abstract data type for other modules.
+```haskell
+construct :: [Int] -> Network
+```
+Construct a network with dimensions of `[n1,n2,n3,...,ni]`, where `n1` is input layer, `ni` output layer and other hidden layers. Weighs are randomly initialized 
+in the range of [0,1].
 
+```haskell
+train :: Network -> Maybe [([Double],[Double])] -> Double -> Int -> Network
+```
+Trains the network with the backpropagation algorithm given `Maybe [([Double],[Double])]` as training set. `Maybe` is used for simplicity when used in 
+`FrontEnd.hs` due to the conversion from JSON. Takes learning rate and number of epochs as arguments as well.
 
-Of course, having n-dimensional input vector for n days opening price of a share, it is not that hard to output the value for (n+1)-opening day. 
-Easy naive algorithm would be to average all of the days, and the result would not be that far off. But what is network unique in, compared to the 
-simple algorithm is it's general, can be used for different input information. Once it's trained, it only propagates inputs to generate output. 
-I shall try using other financial indicators and see the results underneath.
+```haskell
+output :: Network -> [Double] -> Double
+```
+Produces an output given an input vector.
+
+```haskell
+predict :: Network -> [Double] -> Int -> [Double]
+```
+Predicts the evolution of stock for n days given an initial input.
+
+```haskell
+mistake :: Network -> Maybe [([Double],[Double])] -> Double
+```
+Calculates the square error summed over all the training set.
+
+<h3>Parser.hs</h3>
+Parses the JSON results from the YQL queries.
+
+```haskell
+writeStockData :: String -> String -> String -> IO ()
+```
+Writes stock data in a JSON format given the company, start and end date as arguments. E.g. writeStockData "YHOO" "2016-01-01" "2016-12-14"
+
+```haskell
+getNDaysForw :: String -> String -> Int -> IO [Double]
+getNDaysBack :: String -> String -> Int -> IO [Double]
+```
+Returns the opening prices for the following/previous n days.
