@@ -1,12 +1,36 @@
 <h2>Haskell implementation of Neural Networks</h2>
 <h3>Introduction</h3>
-Currently taking the University of Toronto's Neural Networks Coursera course, I was keen to try to take my first steps into the world
-of machine learning and artificial intelligence. So far, I have created only two models. First one is fully functional classification 
-perceptron algorithm in `SingleLayerPerceptron.hs` file, which is cute, but has several limitations. It takes a n-dimensional input vector and return binary classification.
-It can be trained only on linearly seperable dataset.
+This project aims to analyze the US Stock Market through a simple single-hidden layer neural network, using the backpropagation algorithm.
+The data are fetched from Yahoo API, using YQL queries. There are 3 modules in this repository, each is described bellow. 
 
-<h3>Backpropagation in Yahoo Stock Data Analysis</h3>
-The other files are project of the analysis of Stock Market, using data from the YQL queries in Yahoo Finance. The `FrontEnd.hs` file 
+<h3>FrontEnd.hs</h3>
+The `FrontEnd.hs` file is used for user interaction and serves as the combining element of `Parser` and `NeuralNet` module. It has couple of methods.
+
+
+```haskell
+data Quote = Quote {
+    symbol :: String,
+    date :: Int,
+    open :: Double,
+    high :: Double,
+    low :: Double,
+    close :: Double,
+    volume :: Int,
+    adj_close :: Double
+    } deriving (Show, Generic)
+```
+
+This is a data constructor corresponding to the information received in JSON format from YQL API. Module `Data.Aeson` converts JSON data into 
+this data type generically through the `decode` command.
+
+
+```haskell
+stockToData :: Int -> [Quote] -> [([Double],[Double])]
+```
+
+This method generates n-dimensional inputs with the target value, in the form (input vector, target). Array is used in case of multidimensional target.
+
+<h3>NeuralNet.hs</h3>
 serves a front-end for the back-end training in `NeuralNet` module and parsing of data into JSON files from the `Parser` module. So far the results 
 look reasonable, I shall do statistical analysis in the future. `reality_out.csv` is a comma-separated-value file of the real quotes, whereas 
 `network_out.csv` shows the output of the network. `parsed_data.json` is a JSON file containg the raw (partially parsed) input from the YQL query.

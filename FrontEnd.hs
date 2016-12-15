@@ -41,7 +41,6 @@ normalizeTrainData (x:xs) = (map norm (fst x), map norm (snd x)) : normalizeTrai
     min = minimum (fst x)
     norm = ( \a -> ( a-min ) / (2*( max-min )) )
 
-
 -- PREDICTING SECTION
 
 -- From an input saves the min, max values for a input vector
@@ -72,14 +71,6 @@ inputs :: [Double] -> [Double] -> [[Double]]
 inputs inp [] = []
 inputs inp (o:os) = inp : inputs (tail inp ++ [o]) os
 
--- With a given test values it returns the output values for whole test set
-writeNetworkOutput :: [Double] -> [(Double,Double)] -> String -> IO ()
-writeNetworkOutput out con path = writeFile path $ tail . init . show $ transform out con
-    where
-    transform :: [Double] -> [(Double,Double)] -> [Double]
-    transform [] ys = []
-    transform (x:xs) (y:ys) = ( \x max min -> x * ( max-min ) + min ) x (fst y) (snd y) : transform xs ys
-
 -- Stores raw data as time series in an array
 writeRawData :: Maybe [Quote] -> String -> IO ()
 writeRawData set path = writeFile path $ tail . init . show $ transform set
@@ -87,6 +78,8 @@ writeRawData set path = writeFile path $ tail . init . show $ transform set
     transform :: Maybe [Quote] -> [Double]
     transform Nothing = error "Error while loading data."
     transform (Just xs) = [ open x | x <- xs ]
+
+-- MAIN
 
 main :: IO ()
 main = do 
@@ -103,18 +96,23 @@ main = do
     inp <- B.readFile "parsed_data.json"
     let raw_data = decode inp >>= ( \x -> Just (reverse x) ) :: Maybe [Quote]
     writeRawData raw_data "reality_out.csv"
+
     putStrLn "Write the number of days prior to our predicted day that shall be taken into account (e.g. 4)"
     day_dim <- readLn :: IO Int
 
     let inp_vectors_norm = raw_data >>= (\x -> Just (normalizeTrainData $ stockToData day_dim x)) :: Maybe TrainingSet
     let network = construct [day_dim,day_dim,1]
+
     putStrLn "Write the number of training iteration through the training set (e.g. 1000)"
     n_train <- readLn :: IO Int
+
     let network' = train network inp_vectors_norm 1.0 n_train
+
     putStrLn "Training successful."
     putStrLn ("Error: " ++ (show $ mistake network' inp_vectors_norm))
     putStrLn "Write the day from which you want to predict the stock (form YYYY-MM-DD)"
     test_start_date <- getLine :: IO String
+
     putStrLn "Write the number of days predicting (e.g. 10):"
     test_n_days <- readLn :: IO Int
 
@@ -123,5 +121,6 @@ main = do
     let test_input_norm = normalize test_input (minimum test_input, maximum test_input)
     let prediction = predict network' test_input_norm test_n_days
     let prediction_denorm = map ( \x -> (fromInteger $ round $ x * (10^3)) / (10.0^^3) ) $ denormalize (inputs test_input_norm prediction) test_input prediction
+    
     putStrLn "Day X |  Network | Reality price ($)"
     putStrLn (foldl (++) [] [ "Day " ++ show day ++ " |  " ++ show net ++ "  | " ++ show real ++ "\n" | (net,real,day) <- zip3 prediction_denorm reality_check [1..] ] )

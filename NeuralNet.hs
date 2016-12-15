@@ -102,17 +102,10 @@ train net Nothing rate i = error "Request for financial data is incorrect."
 train net (Just set) rate 0 = net
 train net (Just set) rate i = train (foldr (\a b -> update b (fst a) (snd a) rate) net set) (Just set) rate (i-1)
 
--- Network prediction for n days, taking 
+-- Network prediction for n days, taking k-dimensional input vector
 predict :: Network -> [Double] -> Int -> [Double]
 predict net inp 0 = []
 predict net inp days = prediction : predict net new_inp (days-1)
     where
     prediction = output net inp
     new_inp = tail inp ++ [prediction]
-
-
-
--- Returns outputs of the network for a given data set, using true values as inputs
-output_series :: Network -> Maybe [([Double],[Double])] -> [Double]
-output_series net Nothing = error "Request for financial data is incorrect."
-output_series net (Just xs) = [ output net inp | (inp,tar) <- xs ]
