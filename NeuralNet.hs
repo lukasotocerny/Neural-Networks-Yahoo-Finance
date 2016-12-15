@@ -1,6 +1,6 @@
 -- NeuralNet.hs Backend for the neural net training
 
-module NeuralNet (construct, train, output, mistake) where
+module NeuralNet (construct, train, output, mistake, output_series, predict) where
 
 import Numeric.LinearAlgebra
 import Data.List
@@ -83,17 +83,13 @@ update net input target rate = zipWith (updateWeights rate) (tail passedNet) err
     passedNet = forwardPass net input
     errors = backwardPass passedNet target
 
--- Returns outputs of the network for a given data set
-output :: Network -> Maybe [([Double],[Double])] -> [[Double]]
-output net Nothing = error "Error while loading data."
-output net (Just xs) = [ singleOut net x | x <- xs ]
-    where
-    singleOut :: Network -> ([Double],[Double]) -> [Double]
-    singleOut net input = head $ toLists $ outputs (last $ forwardPass net (fst input))
+-- Returns the denormalized output for a give single input vector
+output :: Network -> [Double] -> Double
+output net inp = head . head . toLists $ outputs (last $ forwardPass net inp)
 
 -- Returns the sum of mistakes on the whole data set
 mistake :: Network -> Maybe TrainingSet -> Double
-mistake net Nothing = error "Error while loading data."
+mistake net Nothing = error "Request for financial data is incorrect."
 mistake net (Just []) = 0
 mistake net (Just (x:xs)) = errs + mistake net (Just xs)
     where
@@ -102,6 +98,21 @@ mistake net (Just (x:xs)) = errs + mistake net (Just xs)
 
 -- Iterates the network on the same training set n times
 train :: Network -> Maybe TrainingSet -> Double -> Int -> Network
-train net Nothing rate i = error "Error while loading data."
+train net Nothing rate i = error "Request for financial data is incorrect."
 train net (Just set) rate 0 = net
 train net (Just set) rate i = train (foldr (\a b -> update b (fst a) (snd a) rate) net set) (Just set) rate (i-1)
+
+-- Network prediction for n days, taking 
+predict :: Network -> [Double] -> Int -> [Double]
+predict net inp 0 = []
+predict net inp days = prediction : predict net new_inp (days-1)
+    where
+    prediction = output net inp
+    new_inp = tail inp ++ [prediction]
+
+
+
+-- Returns outputs of the network for a given data set, using true values as inputs
+output_series :: Network -> Maybe [([Double],[Double])] -> [Double]
+output_series net Nothing = error "Request for financial data is incorrect."
+output_series net (Just xs) = [ output net inp | (inp,tar) <- xs ]
