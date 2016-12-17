@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 -- FrontEnd.hs Frontend for interaction with the backend neural network
 
-import NeuralNet (construct, train, output, mistake, output_series, predict)
+import NeuralNet (construct, train, output, mistake, predict)
 import Parser (writeStockData, getNDaysForw, getNDaysBack)
 import Numeric.LinearAlgebra
 import Data.Aeson
@@ -95,8 +95,9 @@ main = do
     putStrLn "Write the number of training iteration through the training set (e.g. 1000)"
     n_train <- readLn :: IO Int
     let network' = train network inp_vectors_norm 1.0 n_train
-    putStrLn "Training successful."
+    putStrLn "Training in progress..."
     putStrLn ("Error: " ++ (show $ mistake network' inp_vectors_norm))
+    putStrLn "Training successful."
     putStrLn "Write the day from which you want to predict the stock (form YYYY-MM-DD)"
     test_start_date <- getLine :: IO String
     putStrLn "Write the number of days predicting (e.g. 10):"
