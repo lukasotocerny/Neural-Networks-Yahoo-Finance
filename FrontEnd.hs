@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 -- FrontEnd.hs Frontend for interaction with the backend neural network
 
-import NeuralNet (construct, train, output, mistake, predict)
+import NeuralNet (Network, construct, train, output, mistake, predict)
 import Parser (writeStockData, getNDaysForw, getNDaysBack)
 import Numeric.LinearAlgebra
 import Data.Aeson
@@ -72,24 +72,52 @@ writeRawData set path = writeFile path $ tail . init . show $ transform set
     transform Nothing = error "Error while loading data."
     transform (Just xs) = [ open x | x <- xs ]
 
+
+-- MAIN IO
+
+-- Used for user to make prediction on a stock of his choice using trained network
+ioPrediction :: Network -> String -> Int -> IO ()
+ioPrediction network company day_dim = do
+    putStrLn "Write the day from which you want to predict the stock (form YYYY-MM-DD)"
+    test_start_date <- getLine :: IO String
+    putStrLn "Write the number of days predicting (e.g. 10):"
+    test_n_days <- readLn :: IO Int
+    test_input <- getNDaysBack company test_start_date day_dim >>= ( \x ->  return (drop ((length x) - day_dim) x ))
+    reality_check <- getNDaysForw company test_start_date test_n_days >>= ( \x ->  return (map ( \x -> (fromInteger $ round $ x * (10^3)) / (10.0^^3) ) $ take test_n_days x) )
+    let test_input_norm = normalize test_input (minimum test_input, maximum test_input)
+    let prediction = predict network test_input_norm test_n_days
+    let prediction_denorm = map ( \x -> (fromInteger $ round $ x * (10^3)) / (10.0^^3) ) $ denormalize (inputs test_input_norm prediction) test_input prediction
+    putStrLn "Day X |  Network | Reality price ($)"
+    putStrLn (foldl (++) [] [ "Day " ++ show day ++ " |  " ++ show net ++ "  | " ++ show real ++ "\n" | (net,real,day) <- zip3 prediction_denorm reality_check [1..] ] )
+
+-- Loop of making prediction as many times as user wants
+ioPredictionNTimes :: Network -> Int -> IO ()
+ioPredictionNTimes network day_dim = do
+    putStrLn "Do you want to make a prediction? (y/n)"
+    res <- getLine
+    if res == "n" then do
+        return ()
+    else do
+        putStrLn "Write the stock market code of the company you want to look at (e.g. YHOO)"
+        company <- getLine
+        ioPrediction network company day_dim
+        ioPredictionNTimes network day_dim
+
+-- Main
 main :: IO ()
 main = do 
-    putStrLn "Write the stock market code of the company you want to look at (e.g. YHOO)"
+    putStrLn "Write the stock market code of the company you train your network with (e.g. YHOO)"
     company <- getLine
-
     putStrLn "Write the start date of your training data (form YYYY-MM-DD)"
     start_date <- getLine
-
     putStrLn "Write the end date of your training data no more than year from your start (form YYYY-MM-DD)"
     end_date <- getLine
-
     writeStockData company start_date end_date
     inp <- B.readFile "parsed_data.json"
     let raw_data = decode inp >>= ( \x -> Just (reverse x) ) :: Maybe [Quote]
     writeRawData raw_data "reality_out.csv"
     putStrLn "Write the number of days prior to our predicted day that shall be taken into account (e.g. 4)"
     day_dim <- readLn :: IO Int
-
     let inp_vectors_norm = raw_data >>= (\x -> Just (normalizeTrainData $ stockToData day_dim x)) :: Maybe TrainingSet
     let network = construct [day_dim,day_dim,1]
     putStrLn "Write the number of training iteration through the training set (e.g. 1000)"
@@ -98,15 +126,4 @@ main = do
     putStrLn "Training in progress..."
     putStrLn ("Error: " ++ (show $ mistake network' inp_vectors_norm))
     putStrLn "Training successful."
-    putStrLn "Write the day from which you want to predict the stock (form YYYY-MM-DD)"
-    test_start_date <- getLine :: IO String
-    putStrLn "Write the number of days predicting (e.g. 10):"
-    test_n_days <- readLn :: IO Int
-
-    test_input <- getNDaysBack company test_start_date day_dim >>= ( \x ->  return (drop ((length x) - day_dim) x ))
-    reality_check <- getNDaysForw company test_start_date test_n_days >>= ( \x ->  return (map ( \x -> (fromInteger $ round $ x * (10^3)) / (10.0^^3) ) $ take test_n_days x) )
-    let test_input_norm = normalize test_input (minimum test_input, maximum test_input)
-    let prediction = predict network' test_input_norm test_n_days
-    let prediction_denorm = map ( \x -> (fromInteger $ round $ x * (10^3)) / (10.0^^3) ) $ denormalize (inputs test_input_norm prediction) test_input prediction
-    putStrLn "Day X |  Network | Reality price ($)"
-    putStrLn (foldl (++) [] [ "Day " ++ show day ++ " |  " ++ show net ++ "  | " ++ show real ++ "\n" | (net,real,day) <- zip3 prediction_denorm reality_check [1..] ] )
+    ioPredictionNTimes network' day_dim

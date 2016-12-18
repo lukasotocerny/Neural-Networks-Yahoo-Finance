@@ -1,6 +1,6 @@
 -- NeuralNet.hs Backend for the neural net training
 
-module NeuralNet (construct, train, output, mistake, predict) where
+module NeuralNet (Network, construct, train, output, mistake, predict) where
 
 import Numeric.LinearAlgebra
 import Data.List

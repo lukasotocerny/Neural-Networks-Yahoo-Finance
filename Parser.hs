@@ -93,9 +93,9 @@ startDate end_date n = start_date end_int n
         | otherwise = show n
     start_date :: [Int] -> Int -> String
     start_date [yy,mm,dd] n
-        | dd - n > 3 = format yy ++ "-" ++ format mm ++ "-" ++ format (dd-n-3)
-        | mm - 1 > 0 = format yy ++ "-" ++ format (mm-1) ++ "-" ++ format (26-n)
-        | otherwise = format (yy-1) ++ "-" ++  format 12 ++ "-" ++ format (26-n)
+        | dd - n > 5 = format yy ++ "-" ++ format mm ++ "-" ++ format (dd-n-5)
+        | mm - 1 > 0 = format yy ++ "-" ++ format (mm-1) ++ "-" ++ format (24-n)
+        | otherwise = format (yy-1) ++ "-" ++  format 12 ++ "-" ++ format (24-n)
 
 endDate :: String -> Int -> String
 endDate start_date n = end_date start_int n
